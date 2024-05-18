@@ -12,6 +12,8 @@ print(img.shape)
 height, width = red_channel.shape
 x_list = []
 xy_list = []
+
+
 for y in range(height):
     for x in range(width):
         # 获取像素值并打印
