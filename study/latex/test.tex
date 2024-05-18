@@ -1,0 +1,340 @@
+% 导言区
+\documentclass[utf8 10pt]{article}  % book， report， letter  ctexart ctexbook
+\usepackage{ctex} % 中文软件包
+\usepackage{graphicx}%图像包
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\newcommand\degree{^\circ}
+
+\newcommand{\myfont}{\textit{\textbf{\textsf{Fancy Text}}}}
+\title{\heiti 杂谈勾股定理}
+\author{\kaishu 张三}
+\date{\today}
+
+
+% 正文区（文稿区）
+\begin{document}
+    % 字体族设置
+    % 罗马字体
+    \textrm{Roman Family}
+    \rmfamily Roman Family
+    % 无衬线字体
+    \textsf{}
+    \sffamily
+    % 打字机字体
+    \texttt{}
+    \ttfamily
+
+    % 字体系列设置（粗细，宽度）
+    \textmd{Medium Series}
+    \textbf{Boldface Series}
+
+    {\mdseries Medium Series}
+    {\bfseries Boldface Series}
+
+    % 字体形状（直立，斜体，伪斜体，小型大写）
+    \textup{Upright shape}   {\upshape Upright shape}
+    \textit{Italic shape}    {\itshape Italic shape}
+    \textsl{slanted shape}   {\slshape slanted shape}
+    \textsc{small caps shape}{\scshape small caps shape}
+
+
+    % 中文字体
+    {\songti}
+    {\heiti}
+    {\kaishu}
+    {\fangsong}
+
+    %使用\bf{粗体} \it{斜体}代替\textbf{粗体}和\textit{斜体}可以使中文的粗体和斜体显示正常
+    中文字体的\textbf{粗体}与\textit{斜体}
+
+    中文字体的\bf{粗体}与\it{斜体}.
+
+    \sffamily
+    % 字体大小
+    {\tiny 123}\\
+    {\scriptsize 123}\\
+    {\footnotesize 123}\\
+    {\small 123}\\
+    {\normalsize 123}\\
+    {\larg 123}\\
+    {\Large 123}\\
+    {\LARGE 123}\\
+    {\huge 123}\\
+    {\Huge 123}\\
+
+    % 中文字号设置命令
+    \zihao{5} 你好？？
+
+    \myfont
+
+
+
+    \maketitle
+    hello world\LaTeX.
+    % $数学模式$     $$居中显示$$
+    Let $f(x)$ be defined by the formula
+
+    $$f(x)=3x^2+x-1$$ which is a polynomial of degree 2.
+
+
+    直角三角形：设直角三角形$ABC$,其中$\angle C=90\degree$,则有：
+    \begin{equation}
+        AB^2=BC^2+AC^2\label{eq:equation}
+    \end{equation}
+
+
+
+    \tableofcontents
+
+
+    \chapter{绪论}
+
+
+    \section{引言}
+
+
+    \section{实验结果}
+
+    \subsection{实验条件}
+
+    \subsubsection{实验过程}
+
+
+    \chapter{结束}
+
+
+    \section{致谢}
+
+
+    % 特殊符号
+    空行分段，多个空行等于1个
+    自动缩进，绝对不能使用空格代替
+    英文中多个空格处理为1个空格，中文空格将会被忽略
+    汉字与其他字符的间距会自动由Xelatex处理
+    禁止使用中文全角空格
+
+    ` 左单引号
+    ' 右单引号
+    `` 左双引号
+    '' 右双引号
+    -
+    --
+    ---
+    \\ 换行\\
+    空\quad 格
+    两个\qquad 空格
+
+    \#
+    \$
+    \%
+
+
+    % latex引用图片
+    \graphicspath{{../result/}}   % 指定图片所在路径（搜索路径）
+    \includegraphics[scale=0.3,angle=45]{01}          % 导入图片并配置相关可选配置
+
+    % 表格
+    \begin{tabular}{|l |c|| c| c| p{1.5cm}|}     %单竖线，双数线   l左对齐  c居中  r右对齐  p{1.5cm}指定列宽度
+        \hline \hline% 双横线
+        姓名 & 语文 & 数学 & 英语 & 备注 \\
+        \hline % 单横线
+        张三 & 10 & 20 & 30 & 优秀 \\
+        \hline
+    \end{tabular}
+
+
+    % 浮动体环境
+    \LaTeX{}中的插图见(图\ref{fig:fig-01})       %引用
+    \begin{figure}[htbp] % 允许各个位置  here此处 top页顶 bottom页底 page独立一页
+        \centering
+        \includegraphics[scale=0.8]{01}
+        \caption{焊缝图片}\label{fig:fig-01}  %设置标签
+    \end{figure}
+
+
+    在\LaTeX{}中的表格成绩单见(表\ref{tab:tab-score})
+    \begin{table}[htbp]
+        \centering
+        \caption{成绩单}
+        \begin{tabular}{|l |c|| c| c| p{1.5cm}|}     %单竖线，双数线   l左对齐  c居中  r右对齐  p{1.5cm}指定列宽度
+            \hline% 双横线
+            姓名 & 语文 & 数学 & 英语 & 备注 \\
+            \hline % 单横线
+            张三 & 10 & 20 & 30 & 优秀 \\
+            \hline
+        \end{tabular}\label{tab:tab-score}
+    \end{table}
+
+
+    % 数学公式
+    % 数学模式 $$
+    $a+b=c+8-d$ \\
+    $a_{x^2-2+1}$\\
+    \begin{math}
+        a+b=c+8-d\\
+        3x^{20}=y\\       % 上标
+        a_{x^2-2+1}\\     % 下标
+        $a_{x^2-2+1}$
+    \end{math}
+
+
+    \section{希腊字母}\label{sec:}
+    \alpha
+    \beta
+    \gamma
+    \epsilon
+    \pi
+    \omega
+
+    \Gamma
+    \Delta
+    \Theta
+    \Pi
+    \Omega
+
+
+    \section{数学函数}
+    \log
+    \sin
+    \cos
+    \arcsin
+    \arccos
+    \ln
+
+    $y=\sin^2 x+\cos^2 x=1$\\
+    $y=\sin^{2x}$\\
+    $y=\sin^{2x} x$\\
+    \sqrt{2}
+    \sqrt[4]{16}
+
+
+    \section{分式}
+    $\frac{3}{4}$
+    $3/4$
+    $\frac{x}{x^2+x+1}$
+
+    行间公式
+    \[a+b=c-0\]
+    $$a+b=0-9$$
+    \begin{displaymath}
+        a+b=c-d
+    \end{displaymath}
+
+
+    自动编号公式equation环境
+    \begin{equation}
+        a+b=c+d\label{eq:equation2}
+    \end{equation}
+
+    不编号公式equation*环境,仍然是居中
+    \begin{equation*}
+    \end{equation*}
+
+    矩阵
+    \begin{matrix}
+        0 & 1 \\
+        2 & 3
+    \end{matrix}
+
+    \begin{pmatrix}
+        0 & 1 \\
+        2 & 3
+    \end{pmatrix}
+
+    \begin{bmatrix}
+        0 & 1 \\
+        2 & 3
+    \end{bmatrix}
+
+    \begin{Bmatrix}
+        0 & 1 \\
+        2 & 3
+    \end{Bmatrix}
+
+    \begin{vmatrix}
+        0 & 1 \\
+        2 & 3
+    \end{vmatrix}
+
+    \begin{Vmatrix}
+        0 & 1 \\
+        2 & 3
+    \end{Vmatrix}
+
+
+    常用省略号
+    \dots
+    \vdots
+    \ddots
+
+
+
+    A=\begin{pmatrix}
+          a_{11}^2 & \dots  & a_{1n}^2 \\
+          \vdots   & \ddots & \vdots   \\
+          0        & \dots  & a_{nn}^2 \\
+    \end{pmatrix}_{n \times n}
+
+    行内小矩阵 需要手动加上括号
+    \begin{math}
+        \left(
+        \begin{smallmatrix}
+            0 & 1 \\
+            2 & 3
+        \end{smallmatrix}
+        \right)
+    \end{math}
+
+
+    多行公式
+    \begin{gather*}
+    \end{gather*}
+
+    \begin{gather}
+        aq+b=c\\
+        c+d=e \times 7 \notag \\   %不进行编号
+        d-c=0\\
+    \end{gather}
+
+    % &指定对齐位置
+    \begin{align}
+        a-bbbbbbbbbbbbbbbbb&=c\\
+        d-cccccccc&=e\\
+        a-iii&=q\\
+    \end{align}
+
+    \begin{equation}
+        \begin{split}
+            a+b&=c+d\\
+            &=c+2\\
+            &=5+2\\
+            &=7\\
+        \end{split}\label{eq:equation3}
+    \end{equation}
+
+
+    \begin{equation}
+        \mathbb{A}\\% 生成花体字符
+
+        D(x)=\begin{cases}
+                 1, & \text{如果 } x \in \mathbb{Q}; \\
+                 0, & \text{如果 } x \in \mathbb{R}\setminus\mathbb{Q}.
+        \end{cases}\label{eq:equation4}
+    \end{equation}
+
+
+
+
+
+\end{document}
+
+
+
+
+
+
+
+
+
+
