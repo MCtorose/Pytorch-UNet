@@ -1,5 +1,5 @@
-x1=250;
-x2=28;
+x1=223;
+x2=63;
 % 初始化x轴坐标值
 initialx=360-x1/2;
 % 初始化y轴坐标值
@@ -9,19 +9,19 @@ path='E:\train_image\jpg';
 imdspath = imageDatastore(path);
 % 返回总共的焊缝图片的数量
 numTest = length(imdspath.Files);
-m=zeros(numTest,1);
-Trx=zeros(numTest,1);
-Try=zeros(numTest,1);
-%如果开窗口高度能被2整除,则Try的所有行为240.5，列仍为0
-if (rem(x2,2))==0
-    Try(:,1)=240.5;
-else
-    % 如果开窗口高度不能被2整除,则Try的所有行为240，列仍为0
-    Try(:,1)=240;
-end
-for s=1:numTest
-    Trx(s)=129.3668+(s-1)*0.0437+220;          %120为开窗口初始值
-end
+% m=zeros(numTest,1);
+% Trx=zeros(numTest,1);
+% Try=zeros(numTest,1);
+% %如果开窗口高度能被2整除,则Try的所有行为240.5，列仍为0
+% if (rem(x2,2))==0
+%     Try(:,1)=240.5;
+% else
+%     % 如果开窗口高度不能被2整除,则Try的所有行为240，列仍为0
+%     Try(:,1)=240;
+% end
+% for s=1:1
+%     Trx(s)=129.3668+(s-1)*0.0437+220;          %120为开窗口初始值
+% end
 hold on;
 for i=1:numTest
     % subplot(numTest,1,i);
@@ -38,15 +38,15 @@ for i=1:numTest
     imshow(a);
     %阈值分割
     a=a<30;
-    imshow(a)
+    % imshow(a)
     %腐蚀
     %创建一个方形（square）形状的结构元素，其大小为 8
     se=strel('square',2);
     a=imerode(a,se);
-    imshow(a)
+    % imshow(a)
     %将区域联通
     a = bwlabel(a,8);
-    imshow(a)
+    % imshow(a)
     % 提取图像的轮廓
     contour_img = bwperim(a);
     % 获取轮廓的坐标
@@ -57,7 +57,6 @@ for i=1:numTest
     plot(cols, rows, 'r.'); % 绘制红色点表示轮廓的坐标
     hold off;
     % 定义 points、imagePath 和 imageData
-    points = [100, 200; 150, 250; 200, 300]; % 示例数据
     points=[cols, rows];
     points(end,:)=[];
     % % 读取图像文件
