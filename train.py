@@ -86,7 +86,7 @@ def train_model(
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
     criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss()
     global_step = 0
-
+    # 开始训练
     for epoch in range(1, epochs + 1):
         model.train()
         epoch_loss = 0
@@ -103,14 +103,24 @@ def train_model(
                     f'Network has been defined with {model.n_channels} input channels, ' \
                     f'but loaded images have {images.shape[1]} channels. Please check that ' \
                     'the images are loaded correctly.'
-
+                # 放入GPU设备
+                # 指定张量在内存中的布局格式。
+                # torch.channels_last 是一种内存布局，它将通道维度放在最后，即 (batch_size, height, width, channels)。
+                # 这种布局通常用于与 GPU 兼容的内存格式，可以提高某些操作的性能。
+                # 与之相对的是 torch.contiguous_format，它将通道维度放在第二个位置，即 (batch_size, channels, height, width)
                 images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
                 true_masks = true_masks.to(device=device, dtype=torch.long)
 
+                # 计算损失函数
+                # 启用自动混合精度  mps  "Metal Performance Shaders" 的缩写，
+                # Apple 提供的一种框架，用于在 macOS 和 iOS 设备上高效地执行图形和计算任务,可以在 GPU 上执行，从而加速图形渲染和计算密集型任务。
                 with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
                     masks_pred = model(images)
                     logging.info(f"[INFO] model.n_classes: {model.n_classes}")
-
+                    # 如果模型只有一个类别，那么处理的是二分类问题，通常使用二元交叉熵损失（Binary Cross Entropy, BCE）和 Dice 损失的组合。
+                    # F.sigmoid 用于将预测掩码的值映射到 [0, 1] 区间
+                    # F.softmax 用于将预测掩码的值转换为概率分布，
+                    # F.one_hot 用于将真实掩码转换为 one-hot 编码
                     if model.n_classes == 1:
                         loss = criterion(masks_pred.squeeze(1), true_masks.float())
                         loss += dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
@@ -121,18 +131,38 @@ def train_model(
                             F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
                             multiclass=True
                         )
-
+                # 用于清零模型参数的梯度。在 PyTorch 中，每次反向传播之前都需要清零之前的梯度，以避免梯度累积
+                # set_to_none 参数设置为 True 时，会将梯度设置为 None，这通常比将梯度设置为零更快，因为它避免了创建新的张量。
                 optimizer.zero_grad(set_to_none=True)
+                # 使用梯度缩放器（grad_scaler）来缩放损失值，然后进行反向传播计算梯度。
+                # 梯度缩放器是自动混合精度训练中的一个组件，用于缩放损失值以避免在反向传播过程中出现下溢（underflow）。
+                # 缩放后的损失值用于计算模型参数的梯度。
                 grad_scaler.scale(loss).backward()
+                # 用于取消梯度缩放器对优化器的缩放。
+                # 在调用 optimizer.step() 之前，需要取消梯度缩放，以便优化器可以正确地更新模型参数。
                 grad_scaler.unscale_(optimizer)
+                # 用于梯度裁剪（gradient clipping），这是一种防止梯度爆炸的技术。
+                # 它限制了模型参数梯度的范数，如果梯度的范数超过了设定的阈值 gradient_clipping，则将其缩放到不超过该阈值。
                 torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=gradient_clipping)
+                # 更新模型参数
+                # 梯度缩放器在这里的作用是确保在更新参数之前，梯度已经被正确地缩放和取消缩放。
                 grad_scaler.step(optimizer)
+                # 用于更新梯度缩放器的缩放因子。
+                # 在每次参数更新之后，梯度缩放器会根据前向传播和反向传播的结果来调整缩放因子，以便在下一次迭代中使用。
                 grad_scaler.update()
-
+                # 更新进度条
                 pbar.update(n=images.shape[0])
+                # 于增加全局步数计数器。global_step 是一个用于跟踪训练过程中总步数的变量。
                 global_step += 1
                 epoch_loss += loss.item()
                 logging.info(f'[INFO] train loss: {loss.item()}, step: {global_step}, epoch: {epoch}')
+                # experiment.log({
+                #     'train loss': loss.item(),
+                #     'step': global_step,
+                #     'epoch': epoch
+                # })
+                # tqdm 进度条对象的一个方法，用于在进度条的后缀部分显示额外的信息。
+                # 这里通过关键字参数的形式传入了一个字典，字典的键是 'loss (batch)'，表示要显示的标签，值是 loss.item()，表示当前批次的损失值。
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
 
                 # mIoU计算
@@ -144,131 +174,46 @@ def train_model(
                 division_step = (n_train // (5 * batch_size))
                 if division_step > 0:
                     if global_step % division_step == 0:
+                        # histograms = {}
+                        # for tag, value in model.named_parameters():
+                        # tag = tag.replace('/', '.')
+                        # if not (torch.isinf(value) | torch.isnan(value)).any():
+                        #     histograms['Weights/' + tag] = wandb.Histogram(value.data.cpu())
+                        # if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
+                        #     histograms['Gradients/' + tag] = wandb.Histogram(value.grad.data.cpu())
+
+                        # 验证集
                         val_score = evaluate(net=model, dataloader=val_loader, device=device, amp=amp)
+                        # 调用了学习率调度器（scheduler）的 step 方法，并传入验证分数。学习率调度器可能根据验证分数调整学习率，以优化模型性能。
                         scheduler.step(val_score)
+
                         logging.info('Validation Dice score: {}'.format(val_score))
+                        # try:
+                        #     experiment.log({
+                        #         'learning rate': optimizer.param_groups[0]['lr'],
+                        #         'validation Dice': val_score,
+                        #         'images': wandb.Image(images[0].cpu()),
+                        #         'masks': {
+                        #             'true': wandb.Image(true_masks[0].float().cpu()),
+                        #             'pred': wandb.Image(masks_pred.argmax(dim=1)[0].float().cpu()),
+                        #         },
+                        #         'step': global_step,
+                        #         'epoch': epoch,
+                        #         **histograms
+                        #     })
+                        # except:
+                        #     pass
 
         avg_miou = np.mean(miou_scores)
         logging.info(f'[INFO] Epoch {epoch} averaged mIoU: {avg_miou}')
-
-        # 5. Begin training
-        # for epoch in range(1, epochs + 1):
-        #     model.train()
-        #     epoch_loss = 0
-        #     with tqdm(total=n_train, desc=f'Epoch {epoch}/{epochs}', unit='img') as pbar:
-        #         for batch in train_loader:
-        #             images, true_masks = batch['image'], batch['mask']
-        #             logging.info(f"[INFO] images.shape: {images.shape}")
-        #             logging.info(f"[INFO] true_masks.shape: {true_masks.shape}")
-        #             images = images.repeat(1, 3, 1, 1)
-        #
-        #             assert images.shape[1] == model.n_channels, \
-        #                 f'Network has been defined with {model.n_channels} input channels, ' \
-        #                 f'but loaded images have {images.shape[1]} channels. Please check that ' \
-        #                 'the images are loaded correctly.'
-        #             # 放入GPU设备
-        #             # 指定张量在内存中的布局格式。
-        #             # torch.channels_last 是一种内存布局，它将通道维度放在最后，即 (batch_size, height, width, channels)。
-        #             # 这种布局通常用于与 GPU 兼容的内存格式，可以提高某些操作的性能。
-        #             # 与之相对的是 torch.contiguous_format，它将通道维度放在第二个位置，即 (batch_size, channels, height, width)
-        #             images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
-        #             true_masks = true_masks.to(device=device, dtype=torch.long)
-        #
-        #             # 计算损失函数
-        #             # 启用自动混合精度  mps  "Metal Performance Shaders" 的缩写，
-        #             # Apple 提供的一种框架，用于在 macOS 和 iOS 设备上高效地执行图形和计算任务,可以在 GPU 上执行，从而加速图形渲染和计算密集型任务。
-        #             with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
-        #                 masks_pred = model(images)
-        #                 logging.info(f"[INFO] model.n_classes: {model.n_classes}")
-        #                 # 如果模型只有一个类别，那么处理的是二分类问题，通常使用二元交叉熵损失（Binary Cross Entropy, BCE）和 Dice 损失的组合。
-        #                 # F.sigmoid 用于将预测掩码的值映射到 [0, 1] 区间
-        #                 # F.softmax 用于将预测掩码的值转换为概率分布，
-        #                 # F.one_hot 用于将真实掩码转换为 one-hot 编码
-        #                 if model.n_classes == 1:
-        #                     loss = criterion(masks_pred.squeeze(1), true_masks.float())
-        #                     loss += dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
-        #                 else:
-        #                     loss = criterion(masks_pred, true_masks)
-        #                     loss += dice_loss(
-        #                         F.softmax(masks_pred, dim=1).float(),
-        #                         F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
-        #                         multiclass=True
-        #                     )
-        #
-        #             # 用于清零模型参数的梯度。在 PyTorch 中，每次反向传播之前都需要清零之前的梯度，以避免梯度累积
-        #             # set_to_none 参数设置为 True 时，会将梯度设置为 None，这通常比将梯度设置为零更快，因为它避免了创建新的张量。
-        #             optimizer.zero_grad(set_to_none=True)
-        #             # 使用梯度缩放器（grad_scaler）来缩放损失值，然后进行反向传播计算梯度。
-        #             # 梯度缩放器是自动混合精度训练中的一个组件，用于缩放损失值以避免在反向传播过程中出现下溢（underflow）。
-        #             # 缩放后的损失值用于计算模型参数的梯度。
-        #             grad_scaler.scale(loss).backward()
-        #             # 用于取消梯度缩放器对优化器的缩放。
-        #             # 在调用 optimizer.step() 之前，需要取消梯度缩放，以便优化器可以正确地更新模型参数。
-        #             grad_scaler.unscale_(optimizer)
-        #             # 用于梯度裁剪（gradient clipping），这是一种防止梯度爆炸的技术。
-        #             # 它限制了模型参数梯度的范数，如果梯度的范数超过了设定的阈值 gradient_clipping，则将其缩放到不超过该阈值。
-        #             torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=gradient_clipping)
-        #             # 更新模型参数
-        #             # 梯度缩放器在这里的作用是确保在更新参数之前，梯度已经被正确地缩放和取消缩放。
-        #             grad_scaler.step(optimizer)
-        #             # 用于更新梯度缩放器的缩放因子。
-        #             # 在每次参数更新之后，梯度缩放器会根据前向传播和反向传播的结果来调整缩放因子，以便在下一次迭代中使用。
-        #             grad_scaler.update()
-        #             # 更新进度条
-        #             pbar.update(n=images.shape[0])
-        #             # 于增加全局步数计数器。global_step 是一个用于跟踪训练过程中总步数的变量。
-        #             global_step += 1
-        #             epoch_loss += loss.item()
-        #             logging.info(f'[INFO] train loss: {loss.item()}, step: {global_step}, epoch: {epoch}')
-        #             # experiment.log({
-        #             #     'train loss': loss.item(),
-        #             #     'step': global_step,
-        #             #     'epoch': epoch
-        #             # })
-        #             # tqdm 进度条对象的一个方法，用于在进度条的后缀部分显示额外的信息。
-        #             # 这里通过关键字参数的形式传入了一个字典，字典的键是 'loss (batch)'，表示要显示的标签，值是 loss.item()，表示当前批次的损失值。
-        #             pbar.set_postfix(**{'loss (batch)': loss.item()})
-        #
-        #             # Evaluation round
-        #             division_step = (n_train // (5 * batch_size))
-        #             if division_step > 0:
-        #                 if global_step % division_step == 0:
-        #                     # histograms = {}
-        #                     # for tag, value in model.named_parameters():
-        #                     # tag = tag.replace('/', '.')
-        #                     # if not (torch.isinf(value) | torch.isnan(value)).any():
-        #                     #     histograms['Weights/' + tag] = wandb.Histogram(value.data.cpu())
-        #                     # if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
-        #                     #     histograms['Gradients/' + tag] = wandb.Histogram(value.grad.data.cpu())
-        #
-        #                     # 验证集
-        #                     val_score = evaluate(net=model, dataloader=val_loader, device=device, amp=amp)
-        #                     # 调用了学习率调度器（scheduler）的 step 方法，并传入验证分数。学习率调度器可能根据验证分数调整学习率，以优化模型性能。
-        #                     scheduler.step(val_score)
-        #
-        #                     logging.info('Validation Dice score: {}'.format(val_score))
-        #                     # try:
-        #                     #     experiment.log({
-        #                     #         'learning rate': optimizer.param_groups[0]['lr'],
-        #                     #         'validation Dice': val_score,
-        #                     #         'images': wandb.Image(images[0].cpu()),
-        #                     #         'masks': {
-        #                     #             'true': wandb.Image(true_masks[0].float().cpu()),
-        #                     #             'pred': wandb.Image(masks_pred.argmax(dim=1)[0].float().cpu()),
-        #                     #         },
-        #                     #         'step': global_step,
-        #                     #         'epoch': epoch,
-        #                     #         **histograms
-        #                     #     })
-        #                     # except:
-        #                     #     pass
-        # if save_checkpoint and epoch % 20 == 0:
-        #     Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
-        #     # 码获取模型的状态字典（state dictionary）。状态字典是 PyTorch 模型的一种表示形式，它包含了模型中所有可学习参数（权重和偏置）的当前状态。
-        #     state_dict = model.state_dict()
-        #     state_dict['mask_values'] = dataset.mask_values
-        #     torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
-        #     logging.info(f'Checkpoint {epoch} saved!')
+        # 保存pth文件
+        if save_checkpoint and epoch % 20 == 0:
+            Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
+            # 码获取模型的状态字典（state dictionary）。状态字典是 PyTorch 模型的一种表示形式，它包含了模型中所有可学习参数（权重和偏置）的当前状态。
+            state_dict = model.state_dict()
+            state_dict['mask_values'] = dataset.mask_values
+            torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
+            logging.info(f'Checkpoint {epoch} saved!')
 
 
 def get_args():
