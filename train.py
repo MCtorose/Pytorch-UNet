@@ -251,7 +251,7 @@ def train_model(
     df = pd.DataFrame(data)
 
     # 保存到Excel文件
-    df.to_excel('UNET_100epoch_8batch_size_output.xlsx', index=False)
+    df.to_excel('./result/UNET_100epoch_8batch_size_output.xlsx', index=False)
 
 
 def get_args():
