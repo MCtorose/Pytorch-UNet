@@ -14,8 +14,17 @@ from unet import UNet
 from utils.data_loading import BasicDataset, CarvanaDataset
 from utils.dice_score import dice_loss
 from utils.miou_score import calculate_iou
-from sklearn.metrics import jaccard_score
+import pandas as pd
 
+data = {
+    'epoch': [],
+    'step': [],
+    'train_loss': [],
+    'dice_score': [],
+    'miou': [],
+}
+
+# 文件路径声明
 dir_img = r'E:\train_image\VOC2\JPEGImages'
 dir_mask = r'E:\train_image\VOC2\SegmentationClass'
 dir_checkpoint = Path('./checkpoints/')
@@ -81,8 +90,7 @@ def train_model(
 
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     optimizer = optim.RMSprop(model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
-    # optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: 最大化dice的值
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
     criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss()
     global_step = 0
@@ -154,6 +162,7 @@ def train_model(
                 pbar.update(n=images.shape[0])
                 # 于增加全局步数计数器。global_step 是一个用于跟踪训练过程中总步数的变量。
                 global_step += 1
+                # 单步求得的训练损失
                 epoch_loss += loss.item()
                 logging.info(f'[INFO] train loss: {loss.item()}, step: {global_step}, epoch: {epoch}')
                 # experiment.log({
@@ -164,11 +173,18 @@ def train_model(
                 # tqdm 进度条对象的一个方法，用于在进度条的后缀部分显示额外的信息。
                 # 这里通过关键字参数的形式传入了一个字典，字典的键是 'loss (batch)'，表示要显示的标签，值是 loss.item()，表示当前批次的损失值。
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
-
+                # 单步求得的训练损失
                 # mIoU计算
                 pred = torch.argmax(F.softmax(masks_pred, dim=1), dim=1) if model.n_classes > 1 else (F.sigmoid(masks_pred) > 0.5).long()
                 miou = calculate_iou(pred, true_masks, model.n_classes)
                 miou_scores.append(miou)
+
+                data['epoch'].append(epoch)
+                data['step'].append(global_step)
+                data['train_loss'].append(loss.item())
+                data['miou'].append(miou)
+
+                # 将训练数据存入excel文件
 
                 # Evaluation round
                 division_step = (n_train // (5 * batch_size))
@@ -188,6 +204,7 @@ def train_model(
                         scheduler.step(val_score)
 
                         logging.info('Validation Dice score: {}'.format(val_score))
+                        data['dice_score'].append(val_score.item())
                         # try:
                         #     experiment.log({
                         #         'learning rate': optimizer.param_groups[0]['lr'],
@@ -207,7 +224,7 @@ def train_model(
         avg_miou = np.mean(miou_scores)
         logging.info(f'[INFO] Epoch {epoch} averaged mIoU: {avg_miou}')
         # 保存pth文件
-        if save_checkpoint and epoch % 20 == 0:
+        if save_checkpoint and epoch % 10 == 0:
             Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
             # 码获取模型的状态字典（state dictionary）。状态字典是 PyTorch 模型的一种表示形式，它包含了模型中所有可学习参数（权重和偏置）的当前状态。
             state_dict = model.state_dict()
@@ -215,11 +232,32 @@ def train_model(
             torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
             logging.info(f'Checkpoint {epoch} saved!')
 
+    # 'epoch': [],
+    # 'step': [],
+    # 'train_loss': [],
+    # 'dice_score': [],
+    # 'miou': [],
+    # 保存训练数据到excel文件
+    print(data)
+    # 计算最长的列表长度
+    max_length = max(len(data[key]) for key in data)
+
+    # 填充缺失的数据
+    for key in ['dice_score', 'miou']:
+        if len(data[key]) < max_length:
+            data[key] += [np.nan] * (max_length - len(data[key]))
+
+    # 创建DataFrame
+    df = pd.DataFrame(data)
+
+    # 保存到Excel文件
+    df.to_excel('UNET_100epoch_8batch_size_output.xlsx', index=False)
+
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks')
-    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=50, help='Number of epochs')
-    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=4, help='Batch size')
+    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=100, help='Number of epochs')
+    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=8, help='Batch size')
     parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=1e-5, help='Learning rate', dest='lr')
     parser.add_argument('--load', '-f', type=str, default=False, help='Load model from a .pth file')
     parser.add_argument('--scale', '-s', type=float, default=0.5, help='Downscaling factor of the images')
@@ -246,9 +284,6 @@ if __name__ == '__main__':
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
     model = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
-    # model = FCN(n_channels=3, num_classes=args.classes, bilinear=args.bilinear)
-
-    # model = model.to(memory_format=torch.channels_last)
 
     logging.info(f'Network:\n'
                  f'\t{model.n_channels} input channels\n'
