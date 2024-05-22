@@ -1,10 +1,10 @@
 """ Full assembly of the parts to form the complete network """
 import torch
 import logging
-from .unet_parts import *
+# from .unet_parts import *
 
 
-# from unet_parts import *
+from unet_parts import *
 
 
 class UNet(nn.Module):
@@ -65,5 +65,5 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     net = UNet(n_channels=3, n_classes=2).to(device)
     input = torch.ones((4, 3, 32, 112)).to(device)
-    output = net(input)
-    print(output.shape)
+    # output = net(input)
+    # print(output.shape)
