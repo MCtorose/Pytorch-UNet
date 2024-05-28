@@ -1,7 +1,11 @@
+from functools import partial
+
 import torch
 import torch.nn as nn
 from einops import rearrange
-from Vit.vit import Vit
+# from Vit.vit import Vit
+
+from vit_pytorch import ViT
 
 
 class EncoderBottleneck(nn.Module):
@@ -84,6 +88,17 @@ class Encoder(nn.Module):
         self.vit_img_dim = img_dim // patch_dim
 
         # self.vit = Vit()
+        self.vit = ViT(
+            image_size=224,
+            patch_size=16,
+            num_classes=1000,
+            dim=1024,
+            depth=6,
+            heads=16,
+            mlp_dim=2048,
+            dropout=0.1,
+            emb_dropout=0.1
+        )
         self.conv2 = nn.Conv2d(in_channels=out_channels * 8, out_channels=512, kernel_size=3, stride=1, padding=1)
         self.norm2 = nn.BatchNorm2d(512)
 
@@ -104,4 +119,39 @@ class Encoder(nn.Module):
         x = self.relu(x)
         return x, x1, x2, x3
 
+        pass
+
+
+class Decoder(nn.Module):
+    def __init__(self, out_channels, class_num):
+        super(Decoder, self).__init__()
+
+        self.decoder1 = DecoderBottleneck(in_channels=out_channels * 8, out_channels=out_channels * 2)
+        self.decoder2 = DecoderBottleneck(in_channels=out_channels * 4, out_channels=out_channels)
+        self.decoder3 = DecoderBottleneck(in_channels=out_channels * 2, out_channels=out_channels * 1 / 2)
+        self.decoder4 = DecoderBottleneck(in_channels=out_channels * 1 / 2, out_channels=out_channels * 1 / 8)
+
+        self.conv1 = nn.Conv2d(in_channels=out_channels * 1 / 8, out_channels=class_num, kernel_size=1)
+
+    def forward(self, x, x1, x2, x3):
+        x = self.decoder1(x, x3)
+        x = self.decoder2(x, x2)
+        x = self.decoder3(x, x1)
+        x = self.decoder4(x)
+        x = self.conv1(x)
+        return x
+        pass
+
+
+class TransUnet(nn.Module):
+    def __init__(self, img_dim, in_channels, out_channels, head_num, mlp_dim, block_num, patch_dim, class_num):
+        super(TransUnet, self).__init__()
+
+        self.encoder = Encoder(img_dim, in_channels, out_channels, head_num, mlp_dim, block_num, patch_dim)
+        self.decoder = Decoder(out_channels, class_num)
+
+    def forward(self, x):
+        x, x1, x2, x3 = self.encoder(x)
+        x = self.decoder(x, x1, x2, x3)
+        return x
         pass

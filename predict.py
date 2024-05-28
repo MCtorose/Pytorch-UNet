@@ -1,7 +1,8 @@
 import argparse
 import logging
 import os
-
+from matplotlib import pyplot as plt
+from sklearn.decomposition import PCA
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -78,6 +79,15 @@ def mask_to_image(mask: np.ndarray, mask_values):
 
 
 if __name__ == '__main__':
+    # 用于保存特征图的全局变量
+    feature_maps = {}
+
+
+    # 定义 hook 函数
+    def forward_hook(module, inputs, outputs, layer_name):
+        feature_maps[layer_name] = outputs.cpu().detach().numpy()
+
+
     args = get_args()
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
@@ -91,11 +101,29 @@ if __name__ == '__main__':
     logging.info(f'Using device {device}')
 
     net.to(device=device)
+    net.inc.register_forward_hook(lambda module, inputs, outputs: forward_hook(module, inputs, outputs, 'x1'))
+    net.down1.register_forward_hook(lambda module, inputs, outputs: forward_hook(module, inputs, outputs, 'x2'))
+    net.down2.register_forward_hook(lambda module, inputs, outputs: forward_hook(module, inputs, outputs, 'x3'))
+    net.down3.register_forward_hook(lambda module, inputs, outputs: forward_hook(module, inputs, outputs, 'x4'))
     state_dict = torch.load(args.model, map_location=device)
     mask_values = state_dict.pop('mask_values', [0, 1])
     net.load_state_dict(state_dict)
 
     logging.info('Model loaded!')
+
+
+    # 绘制特征图
+    def plot_feature_maps(feature_maps, layer_name):
+        feature_map = feature_maps[layer_name][0]
+        n_channels, h, w = feature_map.shape
+        feature_map_flat = feature_map.reshape(n_channels, -1).T
+        pca = PCA(n_components=1)
+        feature_map_reduced = pca.fit_transform(feature_map_flat).reshape(h, w)
+        plt.imshow(feature_map_reduced, cmap='gray')
+        plt.title(f'{layer_name} - PCA')
+        plt.axis('off')
+        plt.show()
+
 
     for i, filename in enumerate(in_files):
         logging.info(f'Predicting image {filename} ...')
@@ -116,3 +144,9 @@ if __name__ == '__main__':
         if args.viz:
             logging.info(f'Visualizing results for image {filename}, close to continue...')
             plot_img_and_mask(img, mask)
+
+        # 绘制跳跃连接处的特征图
+        plot_feature_maps(feature_maps, 'x1')
+        plot_feature_maps(feature_maps, 'x2')
+        plot_feature_maps(feature_maps, 'x3')
+        plot_feature_maps(feature_maps, 'x4')

@@ -9,19 +9,6 @@ path='E:\train_image\jpg';
 imdspath = imageDatastore(path);
 % 返回总共的焊缝图片的数量
 numTest = length(imdspath.Files);
-% m=zeros(numTest,1);
-% Trx=zeros(numTest,1);
-% Try=zeros(numTest,1);
-% %如果开窗口高度能被2整除,则Try的所有行为240.5，列仍为0
-% if (rem(x2,2))==0
-%     Try(:,1)=240.5;
-% else
-%     % 如果开窗口高度不能被2整除,则Try的所有行为240，列仍为0
-%     Try(:,1)=240;
-% end
-% for s=1:1
-%     Trx(s)=129.3668+(s-1)*0.0437+220;          %120为开窗口初始值
-% end
 hold on;
 for i=1:numTest
     % subplot(numTest,1,i);

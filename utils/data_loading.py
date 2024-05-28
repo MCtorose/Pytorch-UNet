@@ -52,9 +52,9 @@ class BasicDataset(Dataset):
 
         logging.info(f'Creating dataset with {len(self.ids)} examples')
         logging.info('Scanning mask files to determine unique values')
-        with Pool() as p:
+        with Pool() as p:  # 创建进程池
             unique = list(tqdm(
-                p.imap(partial(unique_mask_values, mask_dir=self.mask_dir, mask_suffix=self.mask_suffix), self.ids),
+                p.imap(partial(unique_mask_values, mask_dir=self.mask_dir, mask_suffix=self.mask_suffix),self.ids),
                 total=len(self.ids)
             ))
 
@@ -71,7 +71,7 @@ class BasicDataset(Dataset):
         w, h = pil_img.size
         newW, newH = int(scale * w), int(scale * h)
         assert newW > 0 and newH > 0, 'Scale is too small, resized images would have no pixel'
-        pil_img = pil_img.resize((newW, newH), resample=Image.NEAREST if is_mask else Image.BICUBIC)
+        pil_img = pil_img.resize((newW, newH), resample=Image.NEAREST if is_mask else Image.BICUBIC)         # 对图片进行缩放
         img = np.asarray(pil_img)
 
         if is_mask:
@@ -103,7 +103,7 @@ class BasicDataset(Dataset):
         assert len(img_file) == 1, f'Either no image or multiple images found for the ID {name}: {img_file}'
         assert len(mask_file) == 1, f'Either no mask or multiple masks found for the ID {name}: {mask_file}'
         mask = load_image(mask_file[0])
-        img = load_image(img_file[0])
+        img = load_image(img_file[0]).convert('RGB')
 
         assert img.size == mask.size, \
             f'Image and mask {name} should be the same size, but are {img.size} and {mask.size}'

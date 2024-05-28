@@ -16,6 +16,8 @@ from utils.dice_score import dice_loss
 from utils.miou_score import calculate_iou
 import pandas as pd
 
+
+# 用于保存数据到excel
 data = {
     'epoch': [],
     'step': [],
@@ -46,13 +48,13 @@ def train_model(
 ):
     # 1. 创建数据集
     try:
-        dataset = CarvanaDataset(dir_img, dir_mask, img_scale)
+        dataset = CarvanaDataset(images_dir=dir_img, mask_dir=dir_mask, scale=img_scale)
     except (AssertionError, RuntimeError, IndexError):
         dataset = BasicDataset(dir_img, dir_mask, img_scale)
 
     # 2. Split into train / validation partitions
-    n_val = int(len(dataset) * val_percent)
-    n_train = len(dataset) - n_val
+    n_val = int(len(dataset) * val_percent)  # 验证集数据个数
+    n_train = len(dataset) - n_val  # 训练集数据个数
     train_set, val_set = random_split(dataset=dataset, lengths=[n_train, n_val], generator=torch.Generator().manual_seed(0))
 
     logging.info(f"[INFO] Number of samples: {len(dataset)}")
@@ -63,7 +65,7 @@ def train_model(
     # 当设置为 True 时，此选项告诉数据加载器使用固定内存，这可以提高数据传输到 GPU 的性能。
     # 固定内存是锁定在 RAM 中的内存，不能被分页到磁盘，这允许更快地传输到 GPU 内存。
     loader_args = dict(batch_size=batch_size, num_workers=0, pin_memory=True)
-    logging.info(f"[INFO] Using loader_args: {loader_args}")
+    # logging.info(f"[INFO] Using loader_args: {loader_args}")
 
     train_loader = DataLoader(dataset=train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(dataset=val_set, shuffle=False, drop_last=True, **loader_args)
@@ -105,8 +107,7 @@ def train_model(
                 images, true_masks = batch['image'], batch['mask']
                 logging.info(f"[INFO] images.shape: {images.shape}")
                 logging.info(f"[INFO] true_masks.shape: {true_masks.shape}")
-                images = images.repeat(1, 3, 1, 1)
-
+                # 确保图像和掩膜的维度正确
                 assert images.shape[1] == model.n_channels, \
                     f'Network has been defined with {model.n_channels} input channels, ' \
                     f'but loaded images have {images.shape[1]} channels. Please check that ' \
@@ -123,8 +124,7 @@ def train_model(
                 # 启用自动混合精度  mps  "Metal Performance Shaders" 的缩写，
                 # Apple 提供的一种框架，用于在 macOS 和 iOS 设备上高效地执行图形和计算任务,可以在 GPU 上执行，从而加速图形渲染和计算密集型任务。
                 with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
-                    masks_pred = model(images)
-                    logging.info(f"[INFO] model.n_classes: {model.n_classes}")
+                    masks_pred = model(images)  # 输出图片
                     # 如果模型只有一个类别，那么处理的是二分类问题，通常使用二元交叉熵损失（Binary Cross Entropy, BCE）和 Dice 损失的组合。
                     # F.sigmoid 用于将预测掩码的值映射到 [0, 1] 区间
                     # F.softmax 用于将预测掩码的值转换为概率分布，
@@ -164,7 +164,7 @@ def train_model(
                 global_step += 1
                 # 单步求得的训练损失
                 epoch_loss += loss.item()
-                logging.info(f'[INFO] train loss: {loss.item()}, step: {global_step}, epoch: {epoch}')
+                logging.info(f'[INFO] train loss: {loss.item()}, step: {global_step}, epoch: {epoch}\n')
                 # experiment.log({
                 #     'train loss': loss.item(),
                 #     'step': global_step,
@@ -183,8 +183,6 @@ def train_model(
                 data['step'].append(global_step)
                 data['train_loss'].append(loss.item())
                 data['miou'].append(miou)
-
-                # 将训练数据存入excel文件
 
                 # Evaluation round
                 division_step = (n_train // (5 * batch_size))
@@ -229,7 +227,7 @@ def train_model(
             # 码获取模型的状态字典（state dictionary）。状态字典是 PyTorch 模型的一种表示形式，它包含了模型中所有可学习参数（权重和偏置）的当前状态。
             state_dict = model.state_dict()
             state_dict['mask_values'] = dataset.mask_values
-            torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
+            torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch_test{}.pth'.format(epoch)))
             logging.info(f'Checkpoint {epoch} saved!')
 
     # 'epoch': [],
@@ -256,8 +254,8 @@ def train_model(
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks')
-    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=100, help='Number of epochs')
-    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=8, help='Batch size')
+    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=50, help='Number of epochs')
+    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=4, help='Batch size')
     parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=1e-5, help='Learning rate', dest='lr')
     parser.add_argument('--load', '-f', type=str, default=False, help='Load model from a .pth file')
     parser.add_argument('--scale', '-s', type=float, default=0.5, help='Downscaling factor of the images')
@@ -279,10 +277,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
-
-    # Change here to adapt to your data
-    # n_channels=3 for RGB images
-    # n_classes is the number of probabilities you want to get per pixel
     model = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
 
     logging.info(f'Network:\n'
@@ -297,7 +291,6 @@ if __name__ == '__main__':
     #     logging.info(f'Model loaded from {args.load}')
 
     model.to(device=device)
-    print(device)
     try:
         train_model(
             model=model,

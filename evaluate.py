@@ -19,7 +19,6 @@ def evaluate(net, dataloader, device, amp):
     with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
         for batch in tqdm(dataloader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
             image, mask_true = batch['image'], batch['mask']
-            image = image.repeat(1, 3, 1, 1)  # expand image to 3 channels for the model
             # move images and labels to correct device and type
             image = image.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
             mask_true = mask_true.to(device=device, dtype=torch.long)

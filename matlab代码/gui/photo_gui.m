@@ -243,14 +243,6 @@ function pushbutton16_Callback(hObject, eventdata, handles)
  axes(handles.axes2);
     global fpath;
     a=imread(replace(fpath,"_1.jpg","2.png"));
-    % img_2=im2gray(img_2);
-    % img_2=imnoise(img_2,'salt & pepper',0.06);
-    %  img_2=im2double(img_2);
-    % img_2=fft2(img_2);
-    % img_2=fftshift(img_2);
-    % img_2=abs(img_2);
-    % img_2=log(img_2+1);
-    % imshow(img_2,[]);
     imshow(a);
     title('UNET')
 
