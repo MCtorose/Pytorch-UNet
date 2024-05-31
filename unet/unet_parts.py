@@ -5,6 +5,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class FReLU(nn.Module):
+    """FReLU activation https://arxiv.org/abs/2007.11824."""
+
+    def __init__(self, c1, k=3):  # ch_in, kernel
+        """Initializes FReLU activation with channel `c1` and kernel size `k`."""
+        super().__init__()
+        self.conv = nn.Conv2d(c1, c1, k, 1, 1, groups=c1, bias=False)
+        self.bn = nn.BatchNorm2d(c1)
+
+    def forward(self, x):
+        """
+        Applies FReLU activation with max operation between input and BN-convolved input.
+
+        https://arxiv.org/abs/2007.11824
+        """
+        return torch.max(x, self.bn(self.conv(x)))
+
+
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
