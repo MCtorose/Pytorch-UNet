@@ -27,9 +27,9 @@ data = {
 }
 
 # 文件路径声明
-dir_img = r'E:\train_image\VOC2\JPEGImages'
-dir_mask = r'E:\train_image\VOC2\SegmentationClass'
-dir_checkpoint = Path('./checkpoints/')
+dir_img = r'E:\train_image\VOC\JPEGImages'
+dir_mask = r'E:\train_image\VOC\SegmentationClass'
+dir_checkpoint = Path('./checkpoints/')   # 不用管
 
 
 def train_model(

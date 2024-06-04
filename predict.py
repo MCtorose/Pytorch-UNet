@@ -146,7 +146,7 @@ if __name__ == '__main__':
             plot_img_and_mask(img, mask)
 
         # 绘制跳跃连接处的特征图
-        plot_feature_maps(feature_maps, 'x1')
-        plot_feature_maps(feature_maps, 'x2')
-        plot_feature_maps(feature_maps, 'x3')
-        plot_feature_maps(feature_maps, 'x4')
+        # plot_feature_maps(feature_maps, 'x1')
+        # plot_feature_maps(feature_maps, 'x2')
+        # plot_feature_maps(feature_maps, 'x3')
+        # plot_feature_maps(feature_maps, 'x4')

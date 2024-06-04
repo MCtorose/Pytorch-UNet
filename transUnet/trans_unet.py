@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import CrossEntropyLoss, Dropout, Softmax, Linear, Conv2d, LayerNorm
+from torch.nn import Dropout, Softmax, Linear, Conv2d, LayerNorm
 from torch.nn.modules.utils import _pair
 from os.path import join as pjoin
 from collections import OrderedDict
@@ -557,8 +557,8 @@ class Encoder(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, config, img_size, vis):
         super(Transformer, self).__init__()
-        self.embeddings = Embeddings(config, img_size=img_size)
-        self.encoder = Encoder(config, vis)
+        self.embeddings = Embeddings(config=config, img_size=img_size)
+        self.encoder = Encoder(config=config, vis=vis)
 
     def forward(self, input_ids):
         embedding_output, features = self.embeddings(input_ids)
@@ -627,7 +627,7 @@ class VisionTransformer(nn.Module):
         self.num_classes = num_classes
         self.zero_head = zero_head
         self.classifier = config.classifier
-        self.transformer = Transformer(config, img_size, vis)
+        self.transformer = Transformer(config=config, img_size=img_size, vis=vis)
         self.decoder = DecoderCup(config)
         self.segmentation_head = SegmentationHead(
             in_channels=config['decoder_channels'][-1],
@@ -721,7 +721,7 @@ if __name__ == '__main__':
     config_vit.n_skip = args.n_skip
     if args.vit_name.find('R50') != -1:
         config_vit.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-    net = VisionTransformer(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
+    net = VisionTransformer(config=config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
 
     input = torch.ones((1, 3, args.img_size, args.img_size)).cuda()
     print(net)

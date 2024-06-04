@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-img = cv2.imread(filename='../result5.png')
+img = cv2.imread(filename='../resultst.jpg')
 red_channel = img[:, :, 2]
 height, width = red_channel.shape
 x_list = []
@@ -10,7 +10,7 @@ for y in range(height):
     for x in range(width):
         # 获取像素值并打印
         pixel_value = red_channel[y, x]
-        # print(f"Pixel at ({x}, {y}): {pixel_value}")
+        print(f"Pixel at ({x}, {y}): {pixel_value}")
         if pixel_value == 255:
             x_list.append(x)
     xy_list.append((np.mean(x_list), y))

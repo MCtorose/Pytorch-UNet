@@ -20,10 +20,12 @@ def dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: bool = False, 
     dice = (inter + epsilon) / (sets_sum + epsilon)
     return dice.mean()
 
+
 # 这个函数计算多类别分割任务中的 Dice 系数的平均值。它通过将输入和目标张量展平来处理多类别情况。
 def multiclass_dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6):
     # Average of Dice coefficient for all classes
     return dice_coeff(input.flatten(0, 1), target.flatten(0, 1), reduce_batch_first, epsilon)
+
 
 # 这个函数计算 Dice 损失，它是 Dice 系数的补数（1 - Dice 系数）。
 # Dice 损失是分割任务中常用的损失函数，用于训练模型。

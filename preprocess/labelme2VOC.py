@@ -92,7 +92,9 @@ def get_args():
     # parser.add_argument("--output_dir", default="E:/00jpg", type=str, help="output dataset directory")
     # parser.add_argument("--labels", default="E:/600_jpg/imgs/label/labelme/labels.txt", type=str, help="labels file")
 
+    # json文件夹的路径
     parser.add_argument("--input_dir", default=r"E:\train_image\json", type=str, help="input annotated directory")
+    # 输出VOC数据集保存路径
     parser.add_argument("--output_dir", default=r"E:\train_image\VOC", type=str, help="output dataset directory")
     parser.add_argument("--labels", default="./labels.txt", type=str, help="labels file")
     parser.add_argument("--noviz", help="no visualization", action="store_true")
