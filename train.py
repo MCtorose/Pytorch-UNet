@@ -16,7 +16,6 @@ from utils.dice_score import dice_loss
 from utils.miou_score import calculate_iou
 import pandas as pd
 
-
 # 用于保存数据到excel
 data = {
     'epoch': [],
@@ -27,9 +26,9 @@ data = {
 }
 
 # 文件路径声明
-dir_img = r'E:\train_image\VOC\JPEGImages'
-dir_mask = r'E:\train_image\VOC\SegmentationClass'
-dir_checkpoint = Path('./checkpoints/')   # 不用管
+dir_img = r'E:\train_image\VOC3\JPEGImages'
+dir_mask = r'E:\train_image\VOC3\SegmentationClass'
+dir_checkpoint = Path('./checkpoints/')  # 不用管
 
 
 def train_model(

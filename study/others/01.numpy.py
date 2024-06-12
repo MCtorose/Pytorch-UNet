@@ -67,19 +67,13 @@ print(a.mean())
 print(a.mean(axis=0))
 print(a.mean(axis=1))
 
-
 print(a.min(axis=0))
 print(a.max(axis=1))
 
-
 print(np.sort(a))
 # 中位数
-print(np.median(a,axis=0))
+print(np.median(a, axis=0))
 # 方差
 print(np.var(a))
 # 标准差
 print(np.std(a))
-
-
-
-

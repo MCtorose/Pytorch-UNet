@@ -5,8 +5,8 @@ import logging
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 
-from .unet_parts import *
-# from unet_parts import *
+# from .unet_parts import *
+from unet_parts import *
 
 
 class UNet(nn.Module):
