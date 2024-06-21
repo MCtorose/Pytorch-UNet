@@ -12,3 +12,5 @@ for _ in range(5):
     input_tensor = max_pool(input_tensor)
 
 print(input_tensor.shape)
+
+
