@@ -25,10 +25,10 @@ data = {
     'miou': [],
 }
 
-# 文件路径声明
+# 数据集文件路径声明
 dir_img = r'E:\train_image\VOC3\JPEGImages'
 dir_mask = r'E:\train_image\VOC3\SegmentationClass'
-dir_checkpoint = Path('./checkpoints/')  # 不用管
+dir_checkpoint = Path('./checkpoints/')  # 预训练模型的路径不用管
 
 
 def train_model(
@@ -86,7 +86,7 @@ def train_model(
         Checkpoints:     {save_checkpoint}
         Device:          {device.type}
         Images scaling:  {img_scale}
-        Mixed Precision 混合精度: {amp}
+        Mixed Precision: {amp}
     ''')
 
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
@@ -248,7 +248,7 @@ def train_model(
     df = pd.DataFrame(data)
 
     # 保存到Excel文件
-    df.to_excel('./result/UNET_100epoch_8batch_size_output.xlsx', index=False)
+    df.to_excel('./result/test/result.xlsx', index=False)
 
 
 def get_args():

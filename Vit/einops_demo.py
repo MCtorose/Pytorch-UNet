@@ -1,7 +1,6 @@
 import torch
 from vit_pytorch import ViT
 from einops import rearrange, reduce, repeat, asnumpy
-from einops.layers.torch import Rearrange, Reduce
 
 ims = torch.randn(1, 2, 3, 4)
 new_ims = rearrange(tensor=ims, pattern='b c h (w1 w2) -> b (c h w1) w2', w1=2)

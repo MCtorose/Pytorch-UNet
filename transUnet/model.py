@@ -88,17 +88,18 @@ class Encoder(nn.Module):
         self.vit_img_dim = img_dim // patch_dim
 
         # self.vit = Vit()
-        self.vit = ViT(
-            image_size=224,
-            patch_size=16,
-            num_classes=1000,
-            dim=1024,
-            depth=6,
-            heads=16,
-            mlp_dim=2048,
-            dropout=0.1,
-            emb_dropout=0.1
-        )
+        # self.vit = ViT(
+        #     image_size=14,
+        #     patch_size=7,
+        #     num_classes=1000,
+        #     dim=1024,
+        #     depth=block_num,
+        #     heads=head_num,
+        #     mlp_dim=mlp_dim,
+        #     dropout=0.1,
+        #     emb_dropout=0.1,
+        #     channels=512
+        # )
         self.conv2 = nn.Conv2d(in_channels=out_channels * 8, out_channels=512, kernel_size=3, stride=1, padding=1)
         self.norm2 = nn.BatchNorm2d(512)
 
@@ -110,8 +111,11 @@ class Encoder(nn.Module):
         x2 = self.encoder1(x1)
         x3 = self.encoder2(x2)
         x = self.encoder3(x3)
-
-        x = self.vit(x)
+        print(x)
+        print(x.shape)
+        print(tuple(x.shape[2:]))
+        # todo ： 还得再改
+        # x = self.vit(x)
         x = rearrange(x, 'b (x y) c -> b c x y', x=self.vit_img_dim, y=self.vit_img_dim)
 
         x = self.conv2(x)
@@ -128,10 +132,10 @@ class Decoder(nn.Module):
 
         self.decoder1 = DecoderBottleneck(in_channels=out_channels * 8, out_channels=out_channels * 2)
         self.decoder2 = DecoderBottleneck(in_channels=out_channels * 4, out_channels=out_channels)
-        self.decoder3 = DecoderBottleneck(in_channels=out_channels * 2, out_channels=out_channels * 1 / 2)
-        self.decoder4 = DecoderBottleneck(in_channels=out_channels * 1 / 2, out_channels=out_channels * 1 / 8)
+        self.decoder3 = DecoderBottleneck(in_channels=out_channels * 2, out_channels=out_channels * 1 // 2)
+        self.decoder4 = DecoderBottleneck(in_channels=out_channels * 1 // 2, out_channels=out_channels * 1 // 8)
 
-        self.conv1 = nn.Conv2d(in_channels=out_channels * 1 / 8, out_channels=class_num, kernel_size=1)
+        self.conv1 = nn.Conv2d(in_channels=out_channels * 1 // 8, out_channels=class_num, kernel_size=1)
 
     def forward(self, x, x1, x2, x3):
         x = self.decoder1(x, x3)
@@ -155,3 +159,11 @@ class TransUnet(nn.Module):
         x = self.decoder(x, x1, x2, x3)
         return x
         pass
+
+
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = TransUnet(img_dim=224, in_channels=3, out_channels=64, head_num=8, mlp_dim=2048, block_num=12, patch_dim=16, class_num=1000).to(device)
+    input = torch.randn(1, 3, 224, 224).to(device)
+    output = model(input)
+    print(output)
