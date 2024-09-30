@@ -38,7 +38,7 @@ class UNet(nn.Module):
         x1 = self.inc(x)
         print(f"x1.shape为{x1.shape}")
         # x1 = ECA(channel=x1.shape[1], k_size=3)(x1)
-        # x1 = TransformerLayer(input_dim=x1.shape[1], hidden_dim=x1.shape[1], num_heads=4).cuda()(x1)
+        x1 = TransformerLayer(input_dim=x1.shape[1], hidden_dim=x1.shape[1], num_heads=4).cuda()(x1)
         x2 = self.down1(x1)
         print(f"x2.shape为{x2.shape}")
         # x2 = ECA(channel=x2.shape[1], k_size=3)(x2)
