@@ -8,12 +8,11 @@ from pathlib import Path
 from torch import optim
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
-import wandb
 from evaluate import evaluate
 from unet import UNet
 from utils.data_loading import BasicDataset, CarvanaDataset
-from utils.dice_score import dice_loss
-from utils.miou_score import calculate_iou
+from utils.dice_score import dice_loss, Jaccard_loss
+from utils.miou_score import calculate_iou, calculate_mpa, calculate_confusion_matrix
 import pandas as pd
 
 # 用于保存数据到excel
@@ -26,8 +25,8 @@ data = {
 }
 
 # 数据集文件路径声明
-dir_img = r'E:\train_image\VOC3\JPEGImages'
-dir_mask = r'E:\train_image\VOC3\SegmentationClass'
+dir_img = r'E:\train_image\VOC10_17\JPEGImages'
+dir_mask = r'E:\train_image\VOC10_17\SegmentationClass'
 dir_checkpoint = Path('./checkpoints/')  # 预训练模型的路径不用管
 
 
@@ -39,7 +38,7 @@ def train_model(
         learning_rate: float = 1e-5,
         val_percent: float = 0.1,
         save_checkpoint: bool = True,
-        img_scale: float = 0.5,
+        img_scale: float = 1,
         amp: bool = False,
         weight_decay: float = 1e-8,
         momentum: float = 0.999,
@@ -69,13 +68,6 @@ def train_model(
     train_loader = DataLoader(dataset=train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(dataset=val_set, shuffle=False, drop_last=True, **loader_args)
 
-    # (Initialize logging)
-    # experiment = wandb.init(project='U-Net', resume='allow', anonymous='must', name="ECA_unet")
-    # experiment.config.update(
-    #     dict(epochs=epochs, batch_size=batch_size, learning_rate=learning_rate,
-    #          val_percent=val_percent, save_checkpoint=save_checkpoint, img_scale=img_scale, amp=amp)
-    # )
-
     logging.info(f'''
         Starting training:
         Epochs:          {epochs}
@@ -88,7 +80,7 @@ def train_model(
         Images scaling:  {img_scale}
         Mixed Precision: {amp}
     ''')
-
+    #
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     optimizer = optim.RMSprop(model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: 最大化dice的值
@@ -103,7 +95,7 @@ def train_model(
 
         with tqdm(total=n_train, desc=f'Epoch {epoch}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
-                images, true_masks = batch['image'], batch['mask']
+                images, true_masks = batch['image'], batch['mask']  # batch是字典，键值为 'image' 训练原图 和 'mask' 标签
                 logging.info(f"[INFO] images.shape: {images.shape}")
                 logging.info(f"[INFO] true_masks.shape: {true_masks.shape}")
                 # 确保图像和掩膜的维度正确
@@ -132,11 +124,19 @@ def train_model(
                         loss = criterion(masks_pred.squeeze(1), true_masks.float())
                         loss += dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
                     else:
-                        loss = criterion(masks_pred, true_masks)
-                        loss += dice_loss(
+                        # 如果模型有多个类别，那么处理的是多分类问题，通常使用交叉熵损失（Cross Entropy）和 Dice 损失的组合。
+                        weight_criterion = 1.0
+                        weight_dice = 0.5
+                        weight_jaccard = 0.5
+                        loss = weight_criterion * criterion(masks_pred, true_masks)
+                        loss += weight_dice * dice_loss(
                             F.softmax(masks_pred, dim=1).float(),
                             F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
                             multiclass=True
+                        )
+                        loss += weight_jaccard * Jaccard_loss(
+                            F.softmax(masks_pred, dim=1).float(),
+                            F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float()
                         )
                 # 用于清零模型参数的梯度。在 PyTorch 中，每次反向传播之前都需要清零之前的梯度，以避免梯度累积
                 # set_to_none 参数设置为 True 时，会将梯度设置为 None，这通常比将梯度设置为零更快，因为它避免了创建新的张量。
@@ -164,18 +164,18 @@ def train_model(
                 # 单步求得的训练损失
                 epoch_loss += loss.item()
                 logging.info(f'[INFO] train loss: {loss.item()}, step: {global_step}, epoch: {epoch}\n')
-                # experiment.log({
-                #     'train loss': loss.item(),
-                #     'step': global_step,
-                #     'epoch': epoch
-                # })
                 # tqdm 进度条对象的一个方法，用于在进度条的后缀部分显示额外的信息。
                 # 这里通过关键字参数的形式传入了一个字典，字典的键是 'loss (batch)'，表示要显示的标签，值是 loss.item()，表示当前批次的损失值。
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
                 # 单步求得的训练损失
                 # mIoU计算
                 pred = torch.argmax(F.softmax(masks_pred, dim=1), dim=1) if model.n_classes > 1 else (F.sigmoid(masks_pred) > 0.5).long()
-                miou = calculate_iou(pred, true_masks, model.n_classes)
+                miou = calculate_iou(pred=pred, target=true_masks, n_classes=model.n_classes)
+                mpa = calculate_mpa(pred=pred, target=true_masks, n_classes=model.n_classes)
+                confusion_matrix = calculate_confusion_matrix(pred=pred, target=true_masks, n_classes=model.n_classes)
+                # print(f"第 {epoch} 轮IoU:", miou)
+                # print(f"第 {epoch} 轮MPA:", mpa)
+                # print(f"第 {epoch} 轮Confusion Matrix:\n", confusion_matrix)
                 miou_scores.append(miou)
 
                 data['epoch'].append(epoch)
@@ -187,14 +187,6 @@ def train_model(
                 division_step = (n_train // (5 * batch_size))
                 if division_step > 0:
                     if global_step % division_step == 0:
-                        # histograms = {}
-                        # for tag, value in model.named_parameters():
-                        # tag = tag.replace('/', '.')
-                        # if not (torch.isinf(value) | torch.isnan(value)).any():
-                        #     histograms['Weights/' + tag] = wandb.Histogram(value.data.cpu())
-                        # if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
-                        #     histograms['Gradients/' + tag] = wandb.Histogram(value.grad.data.cpu())
-
                         # 验证集
                         val_score = evaluate(net=model, dataloader=val_loader, device=device, amp=amp)
                         # 调用了学习率调度器（scheduler）的 step 方法，并传入验证分数。学习率调度器可能根据验证分数调整学习率，以优化模型性能。
@@ -202,39 +194,19 @@ def train_model(
 
                         logging.info('Validation Dice score: {}'.format(val_score))
                         data['dice_score'].append(val_score.item())
-                        # try:
-                        #     experiment.log({
-                        #         'learning rate': optimizer.param_groups[0]['lr'],
-                        #         'validation Dice': val_score,
-                        #         'images': wandb.Image(images[0].cpu()),
-                        #         'masks': {
-                        #             'true': wandb.Image(true_masks[0].float().cpu()),
-                        #             'pred': wandb.Image(masks_pred.argmax(dim=1)[0].float().cpu()),
-                        #         },
-                        #         'step': global_step,
-                        #         'epoch': epoch,
-                        #         **histograms
-                        #     })
-                        # except:
-                        #     pass
 
         avg_miou = np.mean(miou_scores)
         logging.info(f'[INFO] Epoch {epoch} averaged mIoU: {avg_miou}')
         # 保存pth文件
-        if save_checkpoint and epoch % 10 == 0:
+        if save_checkpoint and epoch % 50 == 0:
             Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
             # 码获取模型的状态字典（state dictionary）。状态字典是 PyTorch 模型的一种表示形式，它包含了模型中所有可学习参数（权重和偏置）的当前状态。
             state_dict = model.state_dict()
             state_dict['mask_values'] = dataset.mask_values
-            torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch_test{}.pth'.format(epoch)))
+            torch.save(state_dict, str(dir_checkpoint / 'checkpoint_epoch_test_10_17_{}.pth'.format(epoch)))
             logging.info(f'Checkpoint {epoch} saved!')
 
-    # 'epoch': [],
-    # 'step': [],
-    # 'train_loss': [],
-    # 'dice_score': [],
-    # 'miou': [],
-    # 保存训练数据到excel文件
+    # # 保存训练数据到excel文件
     print(data)
     # 计算最长的列表长度
     max_length = max(len(data[key]) for key in data)
@@ -248,13 +220,13 @@ def train_model(
     df = pd.DataFrame(data)
 
     # 保存到Excel文件
-    df.to_excel('./result/test/result.xlsx', index=False)
+    df.to_excel('./result/test/result10_17.xlsx', index=False)
 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks')
-    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=50, help='Number of epochs')
-    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=4, help='Batch size')
+    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=1, help='Number of epochs')
+    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=8, help='Batch size')
     parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=1e-5, help='Learning rate', dest='lr')
     parser.add_argument('--load', '-f', type=str, default=False, help='Load model from a .pth file')
     parser.add_argument('--scale', '-s', type=float, default=0.5, help='Downscaling factor of the images')
@@ -280,7 +252,7 @@ if __name__ == '__main__':
 
     logging.info(f'Network:\n'
                  f'\t{model.n_channels} input channels\n'
-                 f'\t{model.n_classes} output channels (classes)\n'
+                 f'\t{model.n_classes} output channels (classes)(background + hanfeng)\n'
                  f'\t{"Bilinear" if model.bilinear else "Transposed conv"} upscaling')
 
     # if args.load:

@@ -166,9 +166,75 @@ class TransformerLayer(nn.Module):
         return x
 
 
-if __name__ == '__main__':
-    input = torch.ones(size=(1, 3, 256, 256))
-    output = TransformerLayer(input_dim=input.shape[1], hidden_dim=input.shape[1], num_heads=3)(input)
+class ResNetBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ResNetBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, padding=0)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels)
 
-    print(output)
-    print(output.shape)
+    def forward(self, input):
+        x0 = input
+        x = F.relu(self.bn1(self.conv1(x0)))
+        x = self.bn2(self.conv2(x))
+        x = x + self.conv3(x0)
+        return F.relu(x, inplace=True)  # Optional: Apply ReLU to the final output
+
+
+class ResNetDown(nn.Module):
+    """Downscaling with maxpool then double conv"""
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.maxpool_conv = nn.Sequential(
+            nn.MaxPool2d(kernel_size=2),
+            ResNetBlock(in_channels, out_channels)
+        )
+
+    def forward(self, x):
+        return self.maxpool_conv(x)
+
+
+class SimAM(nn.Module):
+    def __init__(self, lamda=1e-5):
+        super().__init__()
+        self.lamda = lamda
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        # 获取输入张量的形状信息
+        b, c, h, w = x.shape
+        # 计算像素点数量
+        n = h * w - 1
+        # 计算输入张量在通道维度上的均值
+        mean = torch.mean(x, dim=[-2, -1], keepdim=True)
+        # 计算输入张量在通道维度上的方差
+        var = torch.sum(torch.pow((x - mean), 2), dim=[-2, -1], keepdim=True) / n
+        # 计算特征图的激活值
+        e_t = torch.pow((x - mean), 2) / (4 * (var + self.lamda)) + 0.5
+        # 使用 Sigmoid 函数进行归一化
+        out = self.sigmoid(e_t) * x
+        return out
+
+
+# 测试模块
+if __name__ == "__main__":
+    # 创建 SimAM 实例并进行前向传播测试
+    layer = SimAM(lamda=1e-5)
+    x = torch.randn((2, 3, 224, 224))
+    output = layer(x)
+    # print("Output shape:", output.shape)
+
+# if __name__ == '__main__':
+#     input = torch.ones(size=(1, 64, 64, 224))
+#     model = ResNetDown(in_channels=64, out_channels=128)  # torch.Size([1, 128, 32, 112])
+#     output = model(input)
+#     print(output)
+#     print(output.shape)
+
+# output = TransformerLayer(input_dim=input.shape[1], hidden_dim=input.shape[1], num_heads=3)(input)
+
+# print(output)
+# print(output.shape)

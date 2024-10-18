@@ -1,5 +1,5 @@
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 
 
 # 计算 Dice 系数的平均值。Dice 系数是一种集合相似度度量函数，通常用于计算两个样本的相似度，取值范围在 0 到 1 之间。
@@ -34,3 +34,19 @@ def dice_loss(input: Tensor, target: Tensor, multiclass: bool = False):
     # Dice loss (objective to minimize) between 0 and 1
     fn = multiclass_dice_coeff if multiclass else dice_coeff
     return 1 - fn(input, target, reduce_batch_first=True)
+
+
+# Jaccard Loss，也称为IoU Loss（Intersection over Union Loss），是一种在语义分割任务中常用的损失函数。
+# 它直接优化预测分割区域与真实分割区域之间的重叠度，即Jaccard指数。
+# Jaccard指数定义为两个集合交集与并集的比值，通常用于衡量预测分割结果的质量。
+def Jaccard_loss(preds, labels):
+    smooth = 1e-7
+    preds_int = preds.to(torch.int)
+    labels_int = labels.to(torch.int)
+
+    # Perform the intersection
+    intersection = (preds_int & labels_int).float().sum((1, 2))
+    sum_ = (preds_int | labels_int).float().sum((1, 2))
+    jaccard = (intersection + smooth) / (sum_ - intersection + smooth)
+    loss = 1 - jaccard.mean()
+    return loss

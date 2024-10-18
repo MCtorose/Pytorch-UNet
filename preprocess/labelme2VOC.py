@@ -107,9 +107,9 @@ def get_args():
     # parser.add_argument("--labels", default="E:/600_jpg/imgs/label/labelme/labels.txt", type=str, help="labels file")
 
     # json文件夹的路径
-    parser.add_argument("--input_dir", default=r"E:\train_image\json", type=str, help="input annotated directory")
+    parser.add_argument("--input_dir", default=r"E:\Desktop\Matlab_DeepL\split_png\json", type=str, help="input annotated directory")
     # 输出VOC数据集保存路径
-    parser.add_argument("--output_dir", default=r"E:\train_image\VOC4", type=str, help="output dataset directory")
+    parser.add_argument("--output_dir", default=r"E:\train_image\VOC10_17", type=str, help="output dataset directory")
     parser.add_argument("--labels", default="./labels.txt", type=str, help="labels file")
     parser.add_argument("--noviz", help="no visualization", action="store_true", default=False)
     args = parser.parse_args()
@@ -119,4 +119,4 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
     print(args)
-    # main(args)
+    main(args)

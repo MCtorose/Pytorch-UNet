@@ -2,11 +2,13 @@
 import torch
 import logging
 
-from matplotlib import pyplot as plt
-from sklearn.decomposition import PCA
+from .unet_parts import *
+# from unet_parts import *
 
-# from .unet_parts import *
-from unet_parts import *
+
+# Down: 下采样 + 双卷积
+# Up: 上采样 + 双卷积
+# ResNetBlock: {下采样} + 残差连接（两次【卷积+归一化】）+激活函数
 
 
 class UNet(nn.Module):
@@ -19,11 +21,11 @@ class UNet(nn.Module):
         self.inc = (DoubleConv(in_channels=n_channels, out_channels=64))
 
         # 下采样
-        self.down1 = (Down(in_channels=64, out_channels=128))
-        self.down2 = (Down(in_channels=128, out_channels=256))
-        self.down3 = (Down(in_channels=256, out_channels=512))
+        self.down1 = (ResNetDown(in_channels=64, out_channels=128))
+        self.down2 = (ResNetDown(in_channels=128, out_channels=256))
+        self.down3 = (ResNetDown(in_channels=256, out_channels=512))
         factor = 2 if bilinear else 1
-        self.down4 = (Down(in_channels=512, out_channels=1024 // factor))
+        self.down4 = (ResNetDown(in_channels=512, out_channels=1024 // factor))
 
         # 上采样
         self.up1 = (Up(in_channels=1024, out_channels=512 // factor, bilinear=bilinear))
@@ -35,25 +37,25 @@ class UNet(nn.Module):
         self.outc = (OutConv(in_channels=64, out_channels=n_classes))
 
     def forward(self, x):
+        # print(f"输入x的shape为{x.shape}")  # 输入x的shape为torch.Size([1, 3, 64, 224])
         x1 = self.inc(x)
-        print(f"x1.shape为{x1.shape}")
+        # print(f"x1.shape为{x1.shape}")
         # x1 = ECA(channel=x1.shape[1], k_size=3)(x1)
-        x1 = TransformerLayer(input_dim=x1.shape[1], hidden_dim=x1.shape[1], num_heads=4).cuda()(x1)
+        # x1 = TransformerLayer(input_dim=x1.shape[1], hidden_dim=x1.shape[1], num_heads=4).cuda()(x1)
         x2 = self.down1(x1)
-        print(f"x2.shape为{x2.shape}")
+        # print(f"x2.shape为{x2.shape}")
         # x2 = ECA(channel=x2.shape[1], k_size=3)(x2)
         # x2 = TransformerLayer(input_dim=x2.shape[1], hidden_dim=x2.shape[1], num_heads=4).cuda()(x2)
         x3 = self.down2(x2)
-        print(f"x3.shape为{x3.shape}")
+        # print(f"x3.shape为{x3.shape}")
         # x3 = ECA(channel=x3.shape[1], k_size=3)(x3)
         # x3 = TransformerLayer(input_dim=x3.shape[1], hidden_dim=x3.shape[1], num_heads=4).cuda()(x3)
         x4 = self.down3(x3)
-        print(f"x4.shape为{x4.shape}")
+        # print(f"x4.shape为{x4.shape}")
         # x4 = ECA(channel=x4.shape[1], k_size=3)(x4)
         # x4 = TransformerLayer(input_dim=x4.shape[1], hidden_dim=x4.shape[1], num_heads=4).cuda()(x4)
         x5 = self.down4(x4)
-        print(x5.shape)
-        print(f"x5.shape为{x5.shape}")
+        # print(f"x5.shape为{x5.shape}")
 
         # 四层跳跃连接
         x = self.up1(x5, x4)
